@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Wikipedia API</title>
+
+    <script src="BadassParse.js"></script>
+    <script>
+        function start () {
+            var frmSearch = document.getElementById("searchForm");
+            var txtSearch = document.getElementById("searchBox");
+            var status = document.getElementById("spanStatus");
+            var content = document.getElementById("JSON");
+
+            frmSearch.addEventListener('submit', function (e) {
+                e.preventDefault();
+
+                content.innerHTML = "Downloading Page Data...";
+
+                badassParse({
+                    mode: "callback",
+                    url: "https://en.wikipedia.org/w/api.php?action=query&prop=revisions&rvprop=content&format=json&callback=wikiCB&titles=" + encodeURIComponent(txtSearch.value),
+                    callback: "wikiCB",
+                    JSON_format: "object",
+                    onFailure: function (response) {
+                        alert("BadassParse failed: " + response.reason + "\n\"" + response.msg + "\"");
+                    },
+                    onSuccess: function (response) {
+                        var articleNum;
+                        Object.keys(response.data['query']['pages']).forEach(function (key) {
+                            articleNum = key;
+                        });
+
+                        status.innerHTML = "Received article id: " + articleNum + " (" + response.data['query']['pages'][articleNum]['title'] + ")";
+
+                        parseWikiPage(response.data['query']['pages'][articleNum]['revisions'][0]['*']);
+                    }
+                });
+            });
+        }
+
+        function parseWikiPage(pageText) {
+            var content = document.getElementById("JSON");
+
+            var citations = [];
+
+            function parseStr(str) {
+                var up_to = 0;
+                var start_idx;
+                var end_idx;
+                var start_tmp_idx;
+                var end_tmp_idx;
+                var nest_count;
+                while (true) {
+                    //Find the next {{
+                    start_idx = str.indexOf("{{", up_to);
+
+                    if (start_idx === -1) {
+                        return;
+                    }
+
+                    //Find the matching }}
+                    nest_count = 1;
+                    for (var i = start_idx + 1; i < str.length; i++) {
+                        if (str[i] === "{" && str[i + 1] === "{") {
+                            nest_count++;
+                        }
+
+                        if (str[i] === "}" && str[i + 1] === "}") {
+                            nest_count--;
+                        }
+
+                        if (nest_count === 0) {
+                            end_idx = i + 1; //The last }
+                            break;
+                        }
+                    }
+
+                    up_to = end_idx;
+                    var tmp = str.substr(start_idx + 2, (end_idx - 3) - start_idx);
+                    citations.push(tmp);
+                    parseStr(tmp);
+                }
+            }
+
+//            parseStr(pageText);
+//
+//            for (var i = 0; i < citations.length; i++) {
+//                pageText = pageText.replace("{{" + citations[i] + "}}", "");
+//            }
+
+//            pageText = pageText.replace(/\{\{\s*cite.+?}}/g, "");
+
+            content.innerHTML = pageText;
+
+            alert("Look..");
+
+            pageText = pageText.replace(/\[\[.+?]]/g)
+
+//            content.innerHTML += "<ul>";
+//            for (i = 0; i < citations.length; i++) {
+//                content.innerHTML += "<li>" + citations[i] + "</li>";
+//            }
+//            content.innerHTML += "</ul>";
+        }
+    </script>
+
+    <style>
+        body {
+            margin: 0;
+        }
+        #searchBar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            border-bottom: solid #000 0.15em;
+            background-color: #FFF;
+            box-sizing: border-box;
+            padding: 0.25em .5em;
+        }
+
+        #searchBox {
+            width: 30em;
+        }
+
+        #Content {
+            padding-top: 2em;
+        }
+    </style>
+</head>
+<body onload="start()">
+    <div id="searchBar">
+        <form id="searchForm">
+            <input id="searchBox" type="text" placeholder="Wikipedia Page Title">
+            <input type="submit" value="Get Page Data">
+            <span id="spanStatus"></span>
+        </form>
+    </div>
+    <div id="Content">
+        <code id="JSON"></code>
+    </div>
+</body>
+</html>
